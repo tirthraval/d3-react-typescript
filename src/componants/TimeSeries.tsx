@@ -16,11 +16,12 @@ interface DataPoint {
 }
 
 const TimeSeries = ({ data }: { data: Props[] }) => {
-const [visible, setVisble] = useState<Boolean>(true)
+  const [visible, setVisible] = useState<Boolean>(true);
+  const [highlightColor, setHighlightColor] = useState<string>("red");
+  const [selectedDataPoints, setSelectedDataPoints] = useState<DataPoint[]>([]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   let newXScale: d3.ScaleTime<number, number>;
   let newYScale: d3.ScaleLinear<number, number>;
-   
 
   useEffect(() => {
     const filterData = data.filter((d: Props) => d.series === "series_a");
@@ -30,8 +31,8 @@ const [visible, setVisble] = useState<Boolean>(true)
       value: parseFloat(d.value),
       label: d.label,
     }));
+
     const drawChart = () => {
-      let selectedDataPoints: DataPoint[] = [];
       const margin = { top: 20, right: 20, bottom: 30, left: 70 };
       const width = 600 - margin.left - margin.right;
       const height = 400 - margin.top - margin.bottom;
@@ -151,51 +152,35 @@ const [visible, setVisble] = useState<Boolean>(true)
         if (event.selection) {
           svg
             .selectAll(".circle")
-            .data(selectedDataPoints)
+            .data(selectedDataPoints, (d: any) => d.timestamp.toString())
             .enter()
             .append("circle")
             .attr("class", "circle4")
             .attr("cx", (d: DataPoint) => newXScale(d.timestamp))
             .attr("cy", (d: DataPoint) => newYScale(d.value))
             .attr("r", 2)
-            .style("fill", "red");
+            .style("fill", (d: DataPoint) => d.label === "foo" ? "red" : "purple");
         }
       }
 
       function clearBrush1(event: any) {
         if (event.selection) {
-        //setVisble(true)
+          console.log("Called")
           const extent = event.selection;
           const [x0, x1] = extent.map(newXScale.invert);
           const selectedData = transformData.filter(
             (d: DataPoint) => d.timestamp >= x0 && d.timestamp <= x1
           );
-        //   setSelectedDataPoints(prevPoints  => [...prevPoints, ...selectedData])
-          selectedDataPoints = [...selectedDataPoints, ...selectedData];
-          svg
-            .selectAll(".circle")
-            .data(selectedDataPoints)
-            .enter()
-            .append("circle")
-            .attr("class", "circle")
-            .attr("cx", (d: DataPoint) => newXScale(d.timestamp))
-            .attr("cy", (d: DataPoint) => newYScale(d.value))
-            .attr("r", 2)
-            .style("fill", "red");
-          Brush1G.call(brush.move, null);
-          svg2
-            .selectAll(".circle")
-            .data(selectedData)
-            .enter()
-            .append("circle")
-            .attr("class", "circle1")
-            .attr("cx", (d: DataPoint) => xScale(d.timestamp))
-            .attr("cy", (d: DataPoint) => y2(d.value))
-            .attr("r", 2)
-            .style("fill", "red");
+          const updatedSelectedDataPoints = [
+            ...selectedDataPoints,
+            ...selectedData.map(d => ({ ...d, label: highlightColor === "red" ? "foo" : "bar" }))
+          ];
+          setSelectedDataPoints(updatedSelectedDataPoints);
+          renderSelectedPoints(svg, svg2, xScale, y2, newXScale, newYScale, updatedSelectedDataPoints);
           Brush1G.call(brush.move, null);
         }
       }
+
       function updateGraph(zoomedData: DataPoint[]) {
         svg.selectAll(".circle4").remove();
         newXScale = d3
@@ -214,20 +199,62 @@ const [visible, setVisble] = useState<Boolean>(true)
 
         path.datum(zoomedData).transition().attr("d", newLine);
         gX.transition()
-        .call(d3.axisBottom(newXScale).ticks(7).tickSize(10));
+          .call(d3.axisBottom(newXScale).ticks(7).tickSize(10));
 
         gY.transition().call(d3.axisLeft(newYScale));
       }
+
+      function renderSelectedPoints(svg : any, svg2 : any, xScale : any, y2 : any, newXScale: any, newYScale: any, selectedDataPoints: any) {
+        svg.selectAll(".circle").remove();
+        svg2.selectAll(".circle1").remove();
+        svg
+          .selectAll(".circle")
+          .data(selectedDataPoints, (d: DataPoint) => d.timestamp.toString())
+          .enter()
+          .append("circle")
+          .attr("class", "circle")
+          .attr("cx", (d: DataPoint) => newXScale(d.timestamp))
+          .attr("cy", (d: DataPoint) => newYScale(d.value))
+          .attr("r", 2)
+          .style("fill", (d: DataPoint) => d.label === "foo" ? "red" : "purple");
+        svg2
+          .selectAll(".circle1")
+          .data(selectedDataPoints, (d: DataPoint) => d.timestamp.toString())
+          .enter()
+          .append("circle")
+          .attr("class", "circle1")
+          .attr("cx", (d: DataPoint) => xScale(d.timestamp))
+          .attr("cy", (d: DataPoint) => y2(d.value))
+          .attr("r", 2)
+          .style("fill", (d: DataPoint) => d.label === "foo" ? "red" : "purple");
+      }
+
+      renderSelectedPoints(svg, svg2, xScale, y2, newXScale, newYScale, selectedDataPoints);
     };
 
     drawChart();
-  }, [data]);
+  }, [data, highlightColor, selectedDataPoints]);
+
   return (
     <div className="flex gap-4">
+      <div>
+        <label htmlFor="colorSelect">Select Highlight Color: </label>
+        <select
+          id="colorSelect"
+          onChange={(e) => setHighlightColor(e.target.value)}
+        >
+          <option value="red">foo</option>
+          <option value="purple">bar</option>
+        </select>
+      </div>
       <svg ref={svgRef}></svg>
-      {visible && <CreateLabel/>}
+      {visible && <CreateLabel />}
     </div>
   );
 };
 
-export default TimeSeries;
+export default TimeSeries; 
+
+
+
+
